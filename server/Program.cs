@@ -60,13 +60,17 @@ class ServerUDP
 
         // TODO:[Receive and print Hello]
         
+        int port = setting.ServerPortNumber;
+        string serverIP = setting.ServerIPAddress;
+
+
         byte[] buffer = new byte[1000];
         byte[] msg = Encoding.ASCII.GetBytes("From server: Your message delivered\n");
 
         string data = null;
         int MsgCounter = 0;
-        IPAddress ipAddress = IPAddress.Parse(ServerIPAddress);
-        IPEndPoint localEndpoint = new IPEndPoint(ipAddress, ServerPortNumber);
+        IPAddress ipAddress = IPAddress.Parse(serverIP);
+        IPEndPoint localEndpoint = new IPEndPoint(ipAddress, port);
         IPEndPoint sender = new IPEndPoint(IPAddress.Any, 0);
         EndPoint remoteEP = (EndPoint)sender;
 
