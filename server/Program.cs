@@ -35,25 +35,61 @@ class ServerUDP
     static Setting? setting = JsonSerializer.Deserialize<Setting>(configContent);
 
     // TODO: [Read the JSON file and return the list of DNSRecords]
-
+    public static List<DNSRecord> ReadDNSRecords()
+    {
+        string jsonContent = File.ReadAllText("DNSrecords.json");
+        return JsonSerializer.Deserialize<List<DNSRecord>>(jsonContent) ?? new List<DNSRecord>();
+    }
 
 
 
     public static void start()
     {
-
-
         // TODO: [Create a socket and endpoints and bind it to the server IP address and port number]
+        // Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+        // IPEndPoint serverEndPoint = new IPEndPoint(IPAddress.Any, 8080);
+        // serverSocket.Bind(serverEndPoint);
 
-
+        // byte[] buffer = new byte[1000];
 
         // TODO:[Receive and print a received Message from the client]
-
-
-
+        // EndPoint remoteEP = (EndPoint)sender;
+        // int b = sock.ReceiveFrom(buffer, ref remoteEP);
+        // data = Encoding.ASCII.GetString(buffer, 0, b);
+        // Console.WriteLine("A message received from "+ remoteEP.ToString() + " " + data);
 
         // TODO:[Receive and print Hello]
+        
+        byte[] buffer = new byte[1000];
+        byte[] msg = Encoding.ASCII.GetBytes("From server: Your message delivered\n");
 
+        string data = null;
+        int MsgCounter = 0;
+        IPAddress ipAddress = IPAddress.Parse(ServerIPAddress);
+        IPEndPoint localEndpoint = new IPEndPoint(ipAddress, ServerPortNumber);
+        IPEndPoint sender = new IPEndPoint(IPAddress.Any, 0);
+        EndPoint remoteEP = (EndPoint)sender;
+
+
+        try
+        {
+            sock = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            sock.Bind(localEndpoint);
+            while (MsgCounter < 10)
+            {
+                Console.WriteLine("\n Waiting for the next client message..");
+                int b = sock.ReceiveFrom(buffer, ref remoteEP);
+                data = Encoding.ASCII.GetString(buffer, 0, b);
+                Console.WriteLine("A message received from "+remoteEP.ToString()+ " " + data);
+                sock.SendTo(msg, msg.Length, SocketFlags.None, remoteEP);
+                MsgCounter++;
+            }
+            sock.Close();
+        }
+        catch
+        {
+            Console.WriteLine("\n Socket Error. Terminating");
+        }
 
 
         // TODO:[Send Welcome to the client]
@@ -77,6 +113,61 @@ class ServerUDP
         // TODO:[If no further requests receieved send End to the client]
 
     }
+
+//  byte[] buffer = new byte[1000];
+//  byte[] msg = Encoding.ASCII.GetBytes("From server:
+//  Your message delivered\n");
+//  string data = null;
+//  Socket sock;
+//  int MsgCounter = 0;
+//  IPAddress ipAddress = IPAddress.Parse("127.0.0.1");
+//  IPEndPoint localEndpoint = new IPEndPoint(ipAddress, 32000);
+//  IPEndPoint sender = new IPEndPoint(IPAddress.Any, 0);
+//  EndPoint remoteEP = (EndPoint)sender;
+
+//  try
+//  {
+//  sock = new Socket(AddressFamily.InterNetwork,
+//  SocketType.Dgram, ProtocolType.Udp);
+//  sock.Bind(localEndpoint);
+//  while (MsgCounter < 10)
+//  {
+//  Console.WriteLine("\n Waiting for the next
+//  client message..");
+//  int b = sock.ReceiveFrom(buffer, ref remoteEP);
+//  data = Encoding.ASCII.GetString(buffer, 0, b);
+//  Console.WriteLine("A message received
+//  from "+remoteEP.ToString()+ " " + data);
+//  sock.SendTo(msg, msg.Length, SocketFlags.None, remoteEP);
+//  MsgCounter++;
+//  }
+//  sock.Close();
+//  }
+//  catch
+//  {
+//  Console.WriteLine("\n Socket Error. Terminating");
+//  }
+//  }
+
+
+            // byte[] buffer = new byte[1000];
+            // byte[] msg = Encoding.ASCII.GetBytes("From server: Your message delivered\n");
+            // string data = null;
+
+            // IPAddress ipAddress = IPAddress.Parse("127.0.0.1");
+            // IPEndPoint localEndpoint = new IPEndPoint(ipAddress, 32000);
+
+            // Socket sock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            // sock.Bind(localEndpoint);
+            // sock.Listen(5);
+
+            // Console.WriteLine("\nWaiting for clients...");
+            // Socket newSock = sock.Accept();
+
+            // while (true)
+            // {
+            //     int b = newSock.Receive(buffer);
+            //     data = Encoding.ASCII.GetString(buffer, 0, b);
 
 
 }
