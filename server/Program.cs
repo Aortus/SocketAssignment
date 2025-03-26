@@ -42,58 +42,52 @@ class ServerUDP
     }
 
 
-
     public static void start()
     {
         // TODO: [Create a socket and endpoints and bind it to the server IP address and port number]
-        // Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-        // IPEndPoint serverEndPoint = new IPEndPoint(IPAddress.Any, 8080);
-        // serverSocket.Bind(serverEndPoint);
+        int port = setting.ServerPortNumber;
+        string serverIP = setting.ServerIPAddress;
+        string clientIP = setting.ClientIPAddress;
+        int portClient = setting.ClientPortNumber;
+        IPAddress ipAddressServer = IPAddress.Parse(serverIP);
+        IPAddress iPAddressClient = IPAddress.Parse(clientIP);
 
-        // byte[] buffer = new byte[1000];
-
+        Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+        IPEndPoint serverEndPoint = new IPEndPoint(ipAddressServer, port);
+        serverSocket.Bind(serverEndPoint);
         // TODO:[Receive and print a received Message from the client]
-        // EndPoint remoteEP = (EndPoint)sender;
-        // int b = sock.ReceiveFrom(buffer, ref remoteEP);
+        
+        byte[] buffer = new byte[1000]; 
+        IPEndPoint clientEndPoint = new IPEndPoint(iPAddressClient, portClient); 
+        EndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
+        while (true)
+        {
+            int receivedBytes = serverSocket.ReceiveFrom(buffer, ref remoteEP);
+            string receivedMessage = Encoding.UTF8.GetString(buffer, 0, receivedBytes); 
+            
+            Console.WriteLine($"Received from {clientEndPoint}: {receivedMessage}");
+
+            string responseMessage = "Welcome";
+            byte[] responseData = Encoding.UTF8.GetBytes(responseMessage);
+            serverSocket.SendTo(responseData, remoteEP);
+
+            Console.WriteLine($"Sent response to {clientEndPoint}: {responseMessage}");
+
+            
+        }
+
+
+        
+        // byte[] buffer = new byte[1000];
+        // string data = null;
+
+        // EndPoint remoteEP = (EndPoint)serverEndPoint;
+        // int b = serverSocket.ReceiveFrom(buffer, ref remoteEP);
         // data = Encoding.ASCII.GetString(buffer, 0, b);
         // Console.WriteLine("A message received from "+ remoteEP.ToString() + " " + data);
 
         // TODO:[Receive and print Hello]
         
-        int port = setting.ServerPortNumber;
-        string serverIP = setting.ServerIPAddress;
-
-
-        byte[] buffer = new byte[1000];
-        byte[] msg = Encoding.ASCII.GetBytes("From server: Your message delivered\n");
-
-        string data = null;
-        int MsgCounter = 0;
-        IPAddress ipAddress = IPAddress.Parse(serverIP);
-        IPEndPoint localEndpoint = new IPEndPoint(ipAddress, port);
-        IPEndPoint sender = new IPEndPoint(IPAddress.Any, 0);
-        EndPoint remoteEP = (EndPoint)sender;
-
-
-        try
-        {
-            sock = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-            sock.Bind(localEndpoint);
-            while (MsgCounter < 10)
-            {
-                Console.WriteLine("\n Waiting for the next client message..");
-                int b = sock.ReceiveFrom(buffer, ref remoteEP);
-                data = Encoding.ASCII.GetString(buffer, 0, b);
-                Console.WriteLine("A message received from "+remoteEP.ToString()+ " " + data);
-                sock.SendTo(msg, msg.Length, SocketFlags.None, remoteEP);
-                MsgCounter++;
-            }
-            sock.Close();
-        }
-        catch
-        {
-            Console.WriteLine("\n Socket Error. Terminating");
-        }
 
 
         // TODO:[Send Welcome to the client]
@@ -118,40 +112,41 @@ class ServerUDP
 
     }
 
-//  byte[] buffer = new byte[1000];
-//  byte[] msg = Encoding.ASCII.GetBytes("From server:
-//  Your message delivered\n");
-//  string data = null;
-//  Socket sock;
-//  int MsgCounter = 0;
-//  IPAddress ipAddress = IPAddress.Parse("127.0.0.1");
-//  IPEndPoint localEndpoint = new IPEndPoint(ipAddress, 32000);
-//  IPEndPoint sender = new IPEndPoint(IPAddress.Any, 0);
-//  EndPoint remoteEP = (EndPoint)sender;
+        // int port = setting.ServerPortNumber;
+        // string serverIP = setting.ServerIPAddress;
 
-//  try
-//  {
-//  sock = new Socket(AddressFamily.InterNetwork,
-//  SocketType.Dgram, ProtocolType.Udp);
-//  sock.Bind(localEndpoint);
-//  while (MsgCounter < 10)
-//  {
-//  Console.WriteLine("\n Waiting for the next
-//  client message..");
-//  int b = sock.ReceiveFrom(buffer, ref remoteEP);
-//  data = Encoding.ASCII.GetString(buffer, 0, b);
-//  Console.WriteLine("A message received
-//  from "+remoteEP.ToString()+ " " + data);
-//  sock.SendTo(msg, msg.Length, SocketFlags.None, remoteEP);
-//  MsgCounter++;
-//  }
-//  sock.Close();
-//  }
-//  catch
-//  {
-//  Console.WriteLine("\n Socket Error. Terminating");
-//  }
-//  }
+
+        // byte[] buffer = new byte[1000];
+        // byte[] msg = Encoding.ASCII.GetBytes("From server: Your message delivered\n");
+
+        // string data = null;
+        // int MsgCounter = 0;
+        // IPAddress ipAddress = IPAddress.Parse(serverIP);
+        // IPEndPoint localEndpoint = new IPEndPoint(ipAddress, port);
+        // IPEndPoint sender = new IPEndPoint(IPAddress.Any, 0);
+        // EndPoint remoteEP = (EndPoint)sender;
+
+
+        // try
+        // {
+        //     Socket sock = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+        //     sock.Bind(localEndpoint);
+        //     while (MsgCounter < 10)
+        //     {
+        //         Console.WriteLine("\n Waiting for the next client message..");
+        //         int b = sock.ReceiveFrom(buffer, ref remoteEP);
+        //         data = Encoding.ASCII.GetString(buffer, 0, b);
+        //         Console.WriteLine("A message received from "+remoteEP.ToString()+ " " + data);
+        //         sock.SendTo(msg, msg.Length, SocketFlags.None, remoteEP);
+        //         MsgCounter++;
+        //     }
+        //     sock.Close();
+        // }
+        // catch
+        // {
+        //     Console.WriteLine("\n Socket Error. Terminating");
+        // }
+
 
 
             // byte[] buffer = new byte[1000];
