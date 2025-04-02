@@ -77,7 +77,11 @@ class ClientUDP
         {
             MsgId = count,
             MsgType = MessageType.DNSLookup,
-            Content = new object[] { record.Type, record.Name }
+            Content = new Dictionary<string, string>
+            {
+                { "Type", record.Type },
+                { "Name", record.Name }
+            }
         };
         byte[] data = MessageToBytes(newmsg);
         udpSocket.SendTo(data, ServerEP);
