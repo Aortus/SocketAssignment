@@ -77,10 +77,13 @@ class ClientUDP
         {
             MsgId = count,
             MsgType = MessageType.DNSLookup,
-            Content = new Dictionary<string, string>
+            Content = new DNSRecord
             {
-                { "Type", record.Type },
-                { "Name", record.Name }
+                Type = record.Type,
+                Name = record.Name,
+                Value = null,
+                TTL = null,
+                Priority = null
             }
         };
         byte[] data = MessageToBytes(newmsg);
@@ -111,7 +114,7 @@ class ClientUDP
         {
             MsgId = 1000 + count,
             MsgType = MessageType.Ack,
-            Content = $"{count}"
+            Content = $"{newmsg.MsgId} has been received."
         };
         byte[] ackData = MessageToBytes(Ackmsg);
         udpSocket.SendTo(ackData, remoteEP);
