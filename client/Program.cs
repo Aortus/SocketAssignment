@@ -7,7 +7,6 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using LibData;
 
 // SendTo();
 class Program
@@ -26,6 +25,13 @@ public class Setting
     public string? ClientIPAddress { get; set; }
 }
 
+public class DNSRecord
+{
+    public string? Type { get; set; } // e.g. "A", "AAAA", "CNAME", "MX", etc.
+    public string? Name { get; set; } // e.g. "example.com"
+    public string? Value { get; set; } // e.g. "192.168.1.10"
+}
+
 class ClientUDP
 {
 
@@ -37,47 +43,49 @@ class ClientUDP
 
     public static void start()
     {
-        //TODO: [Create endpoints and socket]
-        int port = setting.ServerPortNumber;
-        string serverIp = setting.ServerIPAddress;
+        string serverIP = setting.ServerIPAddress;
+        int serverPort = setting.ServerPortNumber;
+        Socket udpSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+        IPEndPoint ServerEP = new IPEndPoint(IPAddress.Parse(serverIP), serverPort);
+        string message = "HELLO";
+        byte[] data = Encoding.UTF8.GetBytes(message);
 
-        using (Socket udpSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
-        {
-            IPEndPoint serverEndPoint = new IPEndPoint(IPAddress.Parse(serverIp), port);
+        udpSocket.SendTo(data, ServerEP);
+        Console.WriteLine($"Sent: {message} to {serverIP}:{serverPort}");
 
-            string message = "HELLO";
-            byte[] data = Encoding.UTF8.GetBytes(message);
-
-            udpSocket.SendTo(data, serverEndPoint);
-            Console.WriteLine($"Sent: {message} to {serverIp}:{port}");
-
-            udpSocket.ReceiveTimeout = 5000;
-            byte[] buffer = new byte[1024];
-            EndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
-            int received = udpSocket.ReceiveFrom(buffer, ref remoteEP);
-            string receivedMessage = Encoding.UTF8.GetString(buffer, 0, received);
-            Console.WriteLine($"Received: {receivedMessage} from {remoteEP}");
-        }
-        // TODO: [Create and send DNSLookup Message]
-        string dnsrecords = @"../DNSRecords.json";
+        udpSocket.ReceiveTimeout = 5000;
+        byte[] buffer = new byte[1024];
+        EndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
+        int received = udpSocket.ReceiveFrom(buffer, ref remoteEP);
+        string receivedMessage = Encoding.UTF8.GetString(buffer, 0, received);
+        Console.WriteLine($"Received: {receivedMessage} from {remoteEP}");
+        string dnsrecords = @"..\server\DNSrecords.json";
         string dnsrecordsContent = File.ReadAllText(dnsrecords);
         DNSRecord[] dnsRecords = JsonSerializer.Deserialize<DNSRecord[]>(dnsrecordsContent);
-        
+        foreach(DNSRecord record in dnsRecords)
+        {
+            Console.WriteLine($"Sending DNS Record: {record.Name} with Type: {record.Type} and Value: {record.Value}");
+            SendDNS(record, udpSocket, ServerEP);
+        }
+    }
 
+    public static void SendDNS(DNSRecord record, Socket udpSocket, IPEndPoint ServerEP)
+    {
+        byte[] data = Encoding.UTF8.GetBytes(record.Name);
+        udpSocket.SendTo(data, ServerEP);
+        byte[] buffer = new byte[1024];
+        EndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
+        int received = udpSocket.ReceiveFrom(buffer, ref remoteEP);
+        string receivedMessage = Encoding.UTF8.GetString(buffer, 0, received);
+        Console.WriteLine($"Received: {receivedMessage} from {remoteEP}");
 
-        //TODO: [Receive and print DNSLookupReply from server]
+        string ackMessage = "ACK";
+        byte[] ackData = Encoding.UTF8.GetBytes(ackMessage);
+        udpSocket.SendTo(ackData, remoteEP);
 
-
-        //TODO: [Send Acknowledgment to Server]
-
-        // TODO: [Send next DNSLookup to server]
-        // repeat the process until all DNSLoopkups (correct and incorrect onces) are sent to server and the replies with DNSLookupReply
+        Console.WriteLine("Acknowledgment sent.");
 
         //TODO: [Receive and print End from server]
-
-
-
-
 
     }
 }
