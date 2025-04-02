@@ -27,10 +27,7 @@ public class Setting
 }
 
 class ClientUDP
-{
-
-    //TODO: [Deserialize Setting.json]
-    
+{    
     static string configFile = @"../Setting.json";
     static string configContent = File.ReadAllText(configFile);
     static Setting? setting = JsonSerializer.Deserialize<Setting>(configContent);
@@ -59,16 +56,18 @@ class ClientUDP
         Message deserializedMessage = BytesToMessage(buffer, received);
         Console.WriteLine($"Received: {deserializedMessage.Content} from {remoteEP}");
         Console.ReadLine();
-        string dnsrecords = @"..\server\DNSrecords.json";
-        string dnsrecordsContent = File.ReadAllText(dnsrecords);
-        DNSRecord[] dnsRecords = JsonSerializer.Deserialize<DNSRecord[]>(dnsrecordsContent);
+
+        DNSRecord[] dnsRecords = GetRecords();
         int count = 10;
         foreach(DNSRecord record in dnsRecords)
         {
             count++;
             Console.WriteLine($"Sending DNS Record: {record.Name}");
             SendDNS(record, udpSocket, ServerEP, count);
+            Console.WriteLine($"Press enter to continue to the next record...");
+            Console.ReadLine(); // buffer to see the output
         }
+        End(udpSocket);
     }
 
     public static void SendDNS(DNSRecord record, Socket udpSocket, IPEndPoint ServerEP, int count)
@@ -78,7 +77,7 @@ class ClientUDP
         {
             MsgId = count,
             MsgType = MessageType.DNSLookup,
-            Content = record.Name
+            Content = new object[] { record.Type, record.Name }
         };
         byte[] data = MessageToBytes(newmsg);
         udpSocket.SendTo(data, ServerEP);
@@ -87,6 +86,12 @@ class ClientUDP
         EndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
         int received = udpSocket.ReceiveFrom(buffer, ref remoteEP);
         DNSRecord receivedMessage = MSGtoDNS(buffer, received);
+
+        if (receivedMessage == null)
+        {
+            Console.WriteLine("Received message is null.");
+            return;
+        }
         
         if (receivedMessage != null)
         {
@@ -109,6 +114,14 @@ class ClientUDP
 
         Console.WriteLine("Acknowledgment sent.");
 
+    }
+
+    public static DNSRecord[] GetRecords()
+    {
+        string dnsrecords = @"..\server\DNSrecords.json";
+        string dnsrecordsContent = File.ReadAllText(dnsrecords);
+        DNSRecord[] dnsRecords = JsonSerializer.Deserialize<DNSRecord[]>(dnsrecordsContent);
+        return dnsRecords;
     }
 
     public static byte[] MessageToBytes(Message message)
@@ -150,5 +163,12 @@ class ClientUDP
             Console.WriteLine($"JSON Deserialization Error: {ex.Message}");
             return null;
         }
+    }
+
+    public static void End(Socket udpSocket)
+    {
+        // Close the socket and release resources
+        udpSocket.Shutdown(SocketShutdown.Both);
+        Console.WriteLine("Socket shutdown.");
     }
 }
