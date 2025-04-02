@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using LibData;
 
 // SendTo();
 class Program
@@ -23,13 +24,6 @@ public class Setting
     public string? ServerIPAddress { get; set; }
     public int ClientPortNumber { get; set; }
     public string? ClientIPAddress { get; set; }
-}
-
-public class DNSRecord
-{
-    public string? Type { get; set; } // e.g. "A", "AAAA", "CNAME", "MX", etc.
-    public string? Name { get; set; } // e.g. "example.com"
-    public string? Value { get; set; } // e.g. "192.168.1.10"
 }
 
 class ClientUDP
