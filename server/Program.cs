@@ -34,8 +34,7 @@ class ServerUDP
     static string configContent = File.ReadAllText(configFile);
     static Setting? setting = JsonSerializer.Deserialize<Setting>(configContent);
 
-    // TODO: [Read the JSON file and return the list of DNSRecords]
-    public static DNSRecord[] ReadDNSRecords()
+    private static DNSRecord[] ReadDNSRecords()
     {
         string dnsRecords = @"../server/DNSrecords.json";
         string jsonContent = File.ReadAllText(dnsRecords);
@@ -45,86 +44,91 @@ class ServerUDP
 
     public static void start()
     {
-        // TODO: [Create a socket and endpoints and bind it to the server IP address and port number]
-        Console.WriteLine("Waiting");
-        int port = setting.ServerPortNumber;
-        string serverIP = setting.ServerIPAddress;
-        string clientIP = setting.ClientIPAddress;
-        int portClient = setting.ClientPortNumber;
-        IPAddress ipAddressServer = IPAddress.Parse(serverIP);
-        IPAddress iPAddressClient = IPAddress.Parse(clientIP);
-
         Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-        IPEndPoint serverEndPoint = new IPEndPoint(ipAddressServer, port);
+        IPEndPoint serverEndPoint = EndPointSetup(setting.ServerPortNumber, setting.ServerIPAddress);
         serverSocket.Bind(serverEndPoint);
-        // TODO:[Receive and print a received Message from the client]
         
-        byte[] buffer = new byte[1000]; 
-        IPEndPoint clientEndPoint = new IPEndPoint(iPAddressClient, portClient); 
+        byte[] buffer = new byte[1024]; 
+        IPEndPoint clientEndPoint = EndPointSetup(setting.ClientPortNumber, setting.ClientIPAddress);
         EndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
         while (true)
         {
-            int receivedBytes = serverSocket.ReceiveFrom(buffer, ref remoteEP);
-            string receivedJson = Encoding.UTF8.GetString(buffer, 0, receivedBytes);
-            Message receivedMessage = JsonSerializer.Deserialize<Message>(receivedJson);
-            Console.WriteLine($"Received Content Type: {receivedMessage.Content.GetType()}");
-            Console.WriteLine($"Received message: Type={receivedMessage.MsgType} {receivedMessage.Content}");
+            Message receivedMessage = BytesToMessage(buffer, serverSocket.ReceiveFrom(buffer, ref remoteEP));
+            Console.WriteLine($"Received a Message from: {remoteEP}");
+            Console.WriteLine($"The Message Contains: ID: {receivedMessage.MsgId}, MsgType: {receivedMessage.MsgType}, Content: {receivedMessage.Content}");
+            Console.WriteLine("\n");
 
-            Message responseMessage = null;
-
-            
-            switch (receivedMessage.MsgType)
-            {
-                case MessageType.Hello:
-                    responseMessage = new Message { MsgId = 2, MsgType = MessageType.Welcome, Content = "Welcome!" };
-                    break;
-                case MessageType.DNSLookup:
-                    if (receivedMessage.Content is JsonElement contentElement)
-                    {
-                        DNSRecord dnsRecord = JsonSerializer.Deserialize<DNSRecord>(contentElement.GetRawText());
-                        string domainName = dnsRecord.Name;
-                        string recordType = dnsRecord.Type;
-
-                            var dnsRecords = ReadDNSRecords();
-                            foreach(DNSRecord item in dnsRecords)
-                            {
-                                Console.WriteLine(item.Name);
-                                if (item.Name == domainName && item.Type == recordType)
-                                {
-                                    responseMessage = new Message { MsgId = receivedMessage.MsgId, MsgType = MessageType.DNSLookupReply, Content = item };
-                                    break;
-                                }
-                            }
-                            if (responseMessage is null)
-                            {
-                                responseMessage = new Message { MsgId = receivedMessage.MsgId + 250000, MsgType = MessageType.Error, Content = "Domain not found" };            
-                            }
-                    }
-                    else
-                    {
-                        responseMessage = new Message { MsgId = receivedMessage.MsgId, MsgType = MessageType.Error, Content = "Content is wrong"};
-                    }
-                    break;
-                case MessageType.End:
-                    break;
-                case MessageType.Ack:
-                    break;
-                default:
-                    responseMessage = new Message { MsgId = receivedMessage.MsgId, MsgType = MessageType.Error, Content = "Unknown request type." };
-                    break;
-            }
+            Message responseMessage = HandleMessages(receivedMessage);
                 
             if (responseMessage != null)
             {
-                string responseJson = JsonSerializer.Serialize(responseMessage);
-                Console.WriteLine($"Sending response: {responseJson}");
-                byte[] responseData = Encoding.UTF8.GetBytes(responseJson);
+                byte[] responseData = MessageToBytes(responseMessage);
                 serverSocket.SendTo(responseData, remoteEP);
+                Console.WriteLine($"Sent ID: {responseMessage.MsgId}, MsgType: {responseMessage.MsgType}, Content: {responseMessage.Content}");
             }
             else
             {
-                Console.WriteLine("Waiting for the next message...");
+                Console.WriteLine("Waiting for the next message.");
             }
+        }
+    }
+
+    private static IPEndPoint EndPointSetup(int port, string IP)
+    {
+        IPAddress IPAddress = IPAddress.Parse(IP);
+        return new IPEndPoint(IPAddress, port);
+    }
+
+    private static Message HandleMessages(Message receivedMessage)
+    {
+        switch (receivedMessage.MsgType)
+        {
+            case MessageType.Hello:
+                return new Message { MsgId = 2, MsgType = MessageType.Welcome, Content = "Welcome!" };
+            case MessageType.DNSLookup:
+                return DNSLookup(receivedMessage);
+            case MessageType.End:
+                return null;
+            case MessageType.Ack:
+                return null;
+            default:
+                return new Message { MsgId = receivedMessage.MsgId, MsgType = MessageType.Error, Content = "Unknown request type." };
+        }
+    }
+
+    private static byte[] MessageToBytes(Message message)
+    {
+        string serializedMessage = JsonSerializer.Serialize(message);
+        byte[] data = Encoding.UTF8.GetBytes(serializedMessage);
+        return data;
+    }
+
+    private static Message BytesToMessage(byte[] buffer, int received)
+    {
+        string receivedMessage = Encoding.UTF8.GetString(buffer, 0, received);
+        Message deserializedMessage = JsonSerializer.Deserialize<Message>(receivedMessage);
+        return deserializedMessage;
+    }
+
+    private static Message DNSLookup(Message receivedMessage)
+    {
+        if (receivedMessage.Content is not JsonElement contentElement)
+            return new Message { MsgId = receivedMessage.MsgId, MsgType = MessageType.Error, Content = "Invalid request." };
+
+        DNSRecord dnsRecord = JsonSerializer.Deserialize<DNSRecord>(contentElement.GetRawText());
+        string domainName = dnsRecord.Name;
+        string recordType = dnsRecord.Type;
+
+        var dnsRecords = ReadDNSRecords();
+        DNSRecord foundRecord = dnsRecords.FirstOrDefault(item => item.Name == domainName && item.Type == recordType);
+
+        if (foundRecord != null)
+        {
+            return new Message { MsgId = receivedMessage.MsgId, MsgType = MessageType.DNSLookupReply, Content = foundRecord };
+        }
+        else
+        {
+            return new Message { MsgId = receivedMessage.MsgId + 250000, MsgType = MessageType.Error, Content = "Domain not found." };
         }
     }
 }
