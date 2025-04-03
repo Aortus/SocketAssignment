@@ -9,7 +9,6 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using LibData;
 
-// SendTo();
 class Program
 {
     static void Main(string[] args)
@@ -120,18 +119,6 @@ class MessageHandler
     }
 }
 
-class DNSService
-{
-    private readonly DNSRecord[] _dnsRecords;
-
-    public DNSService()
-    {
-        string filePath = @"..\server\DNSrecords.json";
-        string content = File.ReadAllText(filePath);
-        _dnsRecords = JsonSerializer.Deserialize<DNSRecord[]>(content);
-    }
-}
-
 
 class ClientUDP
 {    
@@ -148,10 +135,7 @@ class ClientUDP
         Console.WriteLine($"Sent: {msg.Content} to {setting.ServerIPAddress}:{setting.ServerIPAddress}");
 
         Message receivemessage = udpClient.Receive();
-        // byte[] buffer = new byte[1024];
-        // EndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
-        // int received = udpSocket.ReceiveFrom(buffer, ref remoteEP);
-        // Message deserializedMessage = BytesToMessage(buffer, received);
+
         Console.WriteLine($"Received: {receivemessage.Content}");
         Console.ReadLine();
 
