@@ -141,13 +141,11 @@ class ClientUDP
 
     public static void start()
     {
-        string serverIP = setting.ServerIPAddress;
-        int serverPort = setting.ServerPortNumber;
-        UDPClient udpClient = new UDPClient(serverIP, serverPort);
+        UDPClient udpClient = new UDPClient(setting.ServerIPAddress, setting.ServerPortNumber);
         Message msg = MessageHandler.CreateMessage(1, MessageType.Hello, "Hello from client!");
         udpClient.Send(msg);
 
-        Console.WriteLine($"Sent: {msg.Content} to {serverIP}:{serverPort}");
+        Console.WriteLine($"Sent: {msg.Content} to {setting.ServerIPAddress}:{setting.ServerIPAddress}");
 
         Message receivemessage = udpClient.Receive();
         // byte[] buffer = new byte[1024];
@@ -158,6 +156,13 @@ class ClientUDP
         Console.ReadLine();
 
         DNSRecord[] dnsRecords = GetRecords();
+
+        SendingDNSRecords(udpClient, dnsRecords);
+        udpClient.Close();
+    }
+
+        private static void SendingDNSRecords(UDPClient udpClient, DNSRecord[] dnsRecords)
+        {
         int count = 10;
         foreach(DNSRecord record in dnsRecords)
         {
@@ -167,10 +172,16 @@ class ClientUDP
             Message returnmessage = udpClient.Receive();
             Console.WriteLine($"Received:");
             Console.WriteLine($"{FormatContent(returnmessage.Content)}");
+            udpClient.Send(new Message
+            {
+                MsgId = count + 1000,
+                MsgType = MessageType.Ack,
+                Content = $"{returnmessage.MsgId}"
+            });
             Console.WriteLine($"Press enter to continue to the next record...");
             Console.ReadLine(); // buffer to see the output
         }
-        udpClient.Close();
+
     }
 
     public static DNSRecord[] GetRecords()
@@ -178,6 +189,10 @@ class ClientUDP
         string dnsrecords = @"..\server\DNSrecords.json";
         string dnsrecordsContent = File.ReadAllText(dnsrecords);
         DNSRecord[] dnsRecords = JsonSerializer.Deserialize<DNSRecord[]>(dnsrecordsContent);
+        // Adding some wrong records for testing
+        DNSRecord wrongrec1 = new() { Type = "A", Name = "www.newsite.com", Value = "192.168.1.60", TTL = 3600 };
+        DNSRecord wrongrec2 =new() { Type = "MX", Name = "newdomain.com", Value = "mail.newdomain.com", Priority = 5, TTL = 3600 };
+        dnsRecords = dnsRecords.Append(wrongrec1).Append(wrongrec2).ToArray();
         return dnsRecords;
     }
 
