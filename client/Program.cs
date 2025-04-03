@@ -25,6 +25,87 @@ public class Setting
     public int ClientPortNumber { get; set; }
     public string? ClientIPAddress { get; set; }
 }
+class UDPClient
+{
+    private readonly Socket _socket;
+    private readonly IPEndPoint _serverEP;
+
+    public UDPClient(string serverIP, int serverPort)
+    {
+        _socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+        _serverEP = new IPEndPoint(IPAddress.Parse(serverIP), serverPort);
+    }
+
+    public void Send(Message message)
+    {
+        byte[] data = MessageHandler.SerializeMessage(message);
+        _socket.SendTo(data, _serverEP);
+    }
+
+    public void Send(DNSRecord dnsRecord, int count)
+    {
+        Message message = new()
+        {
+            MsgId = count,
+            MsgType = MessageType.DNSLookup,
+            Content = new DNSRecord
+            {
+                Type = dnsRecord.Type,
+                Name = dnsRecord.Name,
+                Value = null,
+                TTL = null,
+                Priority = null
+            }
+        };
+        Send(message);
+    }
+
+    public Message Receive()
+    {
+        byte[] buffer = new byte[1024];
+        EndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
+        int received = _socket.ReceiveFrom(buffer, ref remoteEP);
+        return MessageHandler.DeserializeMessage(buffer, received);
+    }
+
+    public void Close()
+    {
+        _socket.Shutdown(SocketShutdown.Both);
+        Console.WriteLine("Socket closed.");
+    }
+}
+
+class MessageHandler
+{
+    public static byte[] SerializeMessage(Message message)
+    {
+        return Encoding.UTF8.GetBytes(JsonSerializer.Serialize(message));
+    }
+
+    public static Message DeserializeMessage(byte[] buffer, int received)
+    {
+        string json = Encoding.UTF8.GetString(buffer, 0, received);
+        return JsonSerializer.Deserialize<Message>(json);
+    }
+
+    public static DNSRecord DeserializeDNSRecord(string json)
+    {
+        return JsonSerializer.Deserialize<DNSRecord>(json);
+    }
+}
+
+class DNSService
+{
+    private readonly DNSRecord[] _dnsRecords;
+
+    public DNSService()
+    {
+        string filePath = @"..\server\DNSrecords.json";
+        string content = File.ReadAllText(filePath);
+        _dnsRecords = JsonSerializer.Deserialize<DNSRecord[]>(content);
+    }
+}
+
 
 class ClientUDP
 {    
@@ -36,25 +117,27 @@ class ClientUDP
     {
         string serverIP = setting.ServerIPAddress;
         int serverPort = setting.ServerPortNumber;
-        Socket udpSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-        IPEndPoint ServerEP = new IPEndPoint(IPAddress.Parse(serverIP), serverPort);
+        UDPClient udpClient = new UDPClient(serverIP, serverPort);
+        // Socket udpSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+        // IPEndPoint ServerEP = new IPEndPoint(IPAddress.Parse(serverIP), serverPort);
         Message msg = new()
         {
             MsgId = 1,
             MsgType = MessageType.Hello,
             Content = "Hello from client!"
         };
-        byte[] data = MessageToBytes(msg);
+        udpClient.Send(msg);
+        // byte[] data = MessageToBytes(msg);
 
-        udpSocket.SendTo(data, ServerEP);
+        // udpSocket.SendTo(data, ServerEP);
         Console.WriteLine($"Sent: {msg.Content} to {serverIP}:{serverPort}");
 
-        udpSocket.ReceiveTimeout = 5000;
-        byte[] buffer = new byte[1024];
-        EndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
-        int received = udpSocket.ReceiveFrom(buffer, ref remoteEP);
-        Message deserializedMessage = BytesToMessage(buffer, received);
-        Console.WriteLine($"Received: {deserializedMessage.Content} from {remoteEP}");
+        Message receivemessage = udpClient.Receive();
+        // byte[] buffer = new byte[1024];
+        // EndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
+        // int received = udpSocket.ReceiveFrom(buffer, ref remoteEP);
+        // Message deserializedMessage = BytesToMessage(buffer, received);
+        Console.WriteLine($"Received: {receivemessage.Content}");
         Console.ReadLine();
 
         DNSRecord[] dnsRecords = GetRecords();
@@ -63,64 +146,13 @@ class ClientUDP
         {
             count++;
             Console.WriteLine($"Sending DNS Record: {record.Name}");
-            SendDNS(record, udpSocket, ServerEP, count);
+            udpClient.Send(record, count);
+            Message returnmessage = udpClient.Receive();
+            Console.WriteLine($"Received: {returnmessage.Content}");
             Console.WriteLine($"Press enter to continue to the next record...");
             Console.ReadLine(); // buffer to see the output
         }
-        End(udpSocket);
-    }
-
-    public static void SendDNS(DNSRecord record, Socket udpSocket, IPEndPoint ServerEP, int count)
-    {
-        // {"Type":"A","Name":"www.outlook.com","Value":"192.168.1.10","TTL":3600,"Priority":null}
-        Message newmsg = new()
-        {
-            MsgId = count,
-            MsgType = MessageType.DNSLookup,
-            Content = new DNSRecord
-            {
-                Type = record.Type,
-                Name = record.Name,
-                Value = null,
-                TTL = null,
-                Priority = null
-            }
-        };
-        byte[] data = MessageToBytes(newmsg);
-        udpSocket.SendTo(data, ServerEP);
-
-        byte[] buffer = new byte[1024];
-        EndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
-        int received = udpSocket.ReceiveFrom(buffer, ref remoteEP);
-        DNSRecord receivedMessage = MSGtoDNS(buffer, received);
-
-        if (receivedMessage == null)
-        {
-            Console.WriteLine("Received message is null.");
-            return;
-        }
-        
-        if (receivedMessage != null)
-        {
-            Console.WriteLine($"Received: Type={receivedMessage.Type}, Name={receivedMessage.Name}, Value={receivedMessage.Value}, TTL={receivedMessage.TTL}, Priority={receivedMessage.Priority} from {remoteEP}");
-        }
-        else
-        {
-            Console.WriteLine("Failed to parse received DNS record.");
-            return;
-        }
-
-        Message Ackmsg = new()
-        {
-            MsgId = 1000 + count,
-            MsgType = MessageType.Ack,
-            Content = $"{newmsg.MsgId} has been received."
-        };
-        byte[] ackData = MessageToBytes(Ackmsg);
-        udpSocket.SendTo(ackData, remoteEP);
-
-        Console.WriteLine("Acknowledgment sent.");
-
+        udpClient.Close();
     }
 
     public static DNSRecord[] GetRecords()
@@ -129,53 +161,5 @@ class ClientUDP
         string dnsrecordsContent = File.ReadAllText(dnsrecords);
         DNSRecord[] dnsRecords = JsonSerializer.Deserialize<DNSRecord[]>(dnsrecordsContent);
         return dnsRecords;
-    }
-
-    public static byte[] MessageToBytes(Message message)
-    {
-        string serializedMessage = JsonSerializer.Serialize(message);
-        byte[] data = Encoding.UTF8.GetBytes(serializedMessage);
-        return data;
-    }
-
-    public static Message BytesToMessage(byte[] buffer, int received)
-    {
-        string receivedMessage = Encoding.UTF8.GetString(buffer, 0, received);
-        Message deserializedMessage = JsonSerializer.Deserialize<Message>(receivedMessage);
-        return deserializedMessage;
-    }
-
-    public static DNSRecord MSGtoDNS(byte[] buffer, int received)
-    {
-        try
-        {
-            string receivedMessage = Encoding.UTF8.GetString(buffer, 0, received);
-            Console.WriteLine($"Received Message: {receivedMessage}");
-
-            Message receivedMsg = JsonSerializer.Deserialize<Message>(receivedMessage);
-
-            if (receivedMsg?.Content == null)
-            {
-                Console.WriteLine("Error: Received message does not contain valid content.");
-                return null;
-            }
-
-            // Deserialize Content into DNSRecord
-            DNSRecord dnsRecord = JsonSerializer.Deserialize<DNSRecord>(receivedMsg.Content.ToString());
-            
-            return dnsRecord;
-        }
-        catch (JsonException ex)
-        {
-            Console.WriteLine($"JSON Deserialization Error: {ex.Message}");
-            return null;
-        }
-    }
-
-    public static void End(Socket udpSocket)
-    {
-        // Close the socket and release resources
-        udpSocket.Shutdown(SocketShutdown.Both);
-        Console.WriteLine("Socket shutdown.");
     }
 }
