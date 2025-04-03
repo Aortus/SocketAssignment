@@ -70,6 +70,13 @@ class UDPClient
 
     public void Close()
     {
+        Message endMessage = new()
+        {
+            MsgId = 0,
+            MsgType = MessageType.End,
+            Content = "End of communication."
+        };
+        Send(endMessage);
         _socket.Shutdown(SocketShutdown.Both);
         Console.WriteLine("Socket closed.");
     }
@@ -77,6 +84,16 @@ class UDPClient
 
 class MessageHandler
 {
+    public static Message CreateMessage(int msgId, MessageType msgType, object content)
+    {
+        return new Message
+        {
+            MsgId = msgId,
+            MsgType = msgType,
+            Content = content
+        };
+    }
+
     public static byte[] SerializeMessage(Message message)
     {
         return Encoding.UTF8.GetBytes(JsonSerializer.Serialize(message));
@@ -85,12 +102,21 @@ class MessageHandler
     public static Message DeserializeMessage(byte[] buffer, int received)
     {
         string json = Encoding.UTF8.GetString(buffer, 0, received);
-        return JsonSerializer.Deserialize<Message>(json);
+        Message? message = JsonSerializer.Deserialize<Message>(json);
+        if (message != null)
+        {
+            message.Content = FormatContent(message.Content);
+        }
+        return message ?? new Message { MsgId = 0, MsgType = MessageType.Error, Content = "Invalid message received." };
     }
 
-    public static DNSRecord DeserializeDNSRecord(string json)
+    private static object FormatContent(object? content)
     {
-        return JsonSerializer.Deserialize<DNSRecord>(json);
+        if (content is JsonElement jsonElement)
+        {
+            return jsonElement.GetRawText();
+        }
+        return content ?? "No content";
     }
 }
 
@@ -118,18 +144,9 @@ class ClientUDP
         string serverIP = setting.ServerIPAddress;
         int serverPort = setting.ServerPortNumber;
         UDPClient udpClient = new UDPClient(serverIP, serverPort);
-        // Socket udpSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-        // IPEndPoint ServerEP = new IPEndPoint(IPAddress.Parse(serverIP), serverPort);
-        Message msg = new()
-        {
-            MsgId = 1,
-            MsgType = MessageType.Hello,
-            Content = "Hello from client!"
-        };
+        Message msg = MessageHandler.CreateMessage(1, MessageType.Hello, "Hello from client!");
         udpClient.Send(msg);
-        // byte[] data = MessageToBytes(msg);
 
-        // udpSocket.SendTo(data, ServerEP);
         Console.WriteLine($"Sent: {msg.Content} to {serverIP}:{serverPort}");
 
         Message receivemessage = udpClient.Receive();
@@ -148,7 +165,8 @@ class ClientUDP
             Console.WriteLine($"Sending DNS Record: {record.Name}");
             udpClient.Send(record, count);
             Message returnmessage = udpClient.Receive();
-            Console.WriteLine($"Received: {returnmessage.Content}");
+            Console.WriteLine($"Received:");
+            Console.WriteLine($"{FormatContent(returnmessage.Content)}");
             Console.WriteLine($"Press enter to continue to the next record...");
             Console.ReadLine(); // buffer to see the output
         }
@@ -161,5 +179,23 @@ class ClientUDP
         string dnsrecordsContent = File.ReadAllText(dnsrecords);
         DNSRecord[] dnsRecords = JsonSerializer.Deserialize<DNSRecord[]>(dnsrecordsContent);
         return dnsRecords;
+    }
+
+    private static string FormatContent(object content)
+    {
+        try
+        {
+            JsonDocument doc = JsonDocument.Parse((string)content);
+            StringBuilder formatted = new StringBuilder();
+            foreach (var property in doc.RootElement.EnumerateObject())
+            {
+                formatted.AppendLine($"{property.Name}: {property.Value}");
+            }
+            return formatted.ToString();
+        }
+        catch
+        {
+            return content.ToString() ?? "No content";
+        }
     }
 }
