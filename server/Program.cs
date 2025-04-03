@@ -44,18 +44,17 @@ class ServerUDP
 
     public static void start()
     {
+        Console.WriteLine($"Server initialization complete. Awaiting incoming messages.");
         Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
         IPEndPoint serverEndPoint = EndPointSetup(setting.ServerPortNumber, setting.ServerIPAddress);
         serverSocket.Bind(serverEndPoint);
         
         byte[] buffer = new byte[1024]; 
-        IPEndPoint clientEndPoint = EndPointSetup(setting.ClientPortNumber, setting.ClientIPAddress);
         EndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
         while (true)
         {
             Message receivedMessage = BytesToMessage(buffer, serverSocket.ReceiveFrom(buffer, ref remoteEP));
-            Console.WriteLine($"Received a Message from: {remoteEP}");
-            Console.WriteLine($"The Message Contains: ID: {receivedMessage.MsgId}, MsgType: {receivedMessage.MsgType}, Content: {receivedMessage.Content}");
+            Console.WriteLine($"Message Received: ID: {receivedMessage.MsgId}, MsgType: {receivedMessage.MsgType}, Content: {receivedMessage.Content}");
             Console.WriteLine("\n");
 
             Message responseMessage = HandleMessages(receivedMessage);
@@ -64,7 +63,7 @@ class ServerUDP
             {
                 byte[] responseData = MessageToBytes(responseMessage);
                 serverSocket.SendTo(responseData, remoteEP);
-                Console.WriteLine($"Sent ID: {responseMessage.MsgId}, MsgType: {responseMessage.MsgType}, Content: {responseMessage.Content}");
+                Console.WriteLine($"Message Sent: {responseMessage.MsgId}, MsgType: {responseMessage.MsgType}, Content: {FormatContent(responseMessage.Content)}");
             }
             else
             {
@@ -88,8 +87,10 @@ class ServerUDP
             case MessageType.DNSLookup:
                 return DNSLookup(receivedMessage);
             case MessageType.End:
+                Console.WriteLine($"Connection with {setting.ClientIPAddress} has been closed.");
                 return null;
             case MessageType.Ack:
+                Console.WriteLine($"Acknowledgment from {setting.ClientIPAddress} received, with content: {receivedMessage.Content}");
                 return null;
             default:
                 return new Message { MsgId = receivedMessage.MsgId, MsgType = MessageType.Error, Content = "Unknown request type." };
@@ -129,6 +130,24 @@ class ServerUDP
         else
         {
             return new Message { MsgId = receivedMessage.MsgId + 250000, MsgType = MessageType.Error, Content = "Domain not found." };
+        }
+    }
+
+    private static string FormatContent(object content)
+    {
+        try
+        {
+            JsonDocument doc = JsonDocument.Parse((string)content);
+            StringBuilder formatted = new StringBuilder();
+            foreach (var property in doc.RootElement.EnumerateObject())
+            {
+                formatted.AppendLine($"{property.Name}: {property.Value}");
+            }
+            return formatted.ToString();
+        }
+        catch
+        {
+            return content.ToString() ?? "No content";
         }
     }
 }
