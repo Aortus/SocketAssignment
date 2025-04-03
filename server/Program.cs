@@ -55,7 +55,6 @@ class ServerUDP
         {
             Message receivedMessage = BytesToMessage(buffer, serverSocket.ReceiveFrom(buffer, ref remoteEP));
             Console.WriteLine($"Message Received: ID: {receivedMessage.MsgId}, MsgType: {receivedMessage.MsgType}, Content: {receivedMessage.Content}");
-            Console.WriteLine("\n");
 
             Message responseMessage = HandleMessages(receivedMessage);
                 
@@ -63,7 +62,7 @@ class ServerUDP
             {
                 byte[] responseData = MessageToBytes(responseMessage);
                 serverSocket.SendTo(responseData, remoteEP);
-                Console.WriteLine($"Message Sent: {responseMessage.MsgId}, MsgType: {responseMessage.MsgType}, Content: {FormatContent(responseMessage.Content)}");
+                Console.WriteLine($"Message Sent: {responseMessage.MsgId}, MsgType: {responseMessage.MsgType}, Content: {FormatContent(responseMessage.Content)} \n");
             }
             else
             {
@@ -90,7 +89,7 @@ class ServerUDP
                 Console.WriteLine($"Connection with {setting.ClientIPAddress} has been closed.");
                 return null;
             case MessageType.Ack:
-                Console.WriteLine($"Acknowledgment from {setting.ClientIPAddress} received, with content: {receivedMessage.Content}");
+                Console.WriteLine($"Acknowledgment from {setting.ClientIPAddress} received, it contains: {receivedMessage.Content}");
                 return null;
             default:
                 return new Message { MsgId = receivedMessage.MsgId, MsgType = MessageType.Error, Content = "Unknown request type." };
@@ -137,17 +136,15 @@ class ServerUDP
     {
         try
         {
-            JsonDocument doc = JsonDocument.Parse((string)content);
-            StringBuilder formatted = new StringBuilder();
-            foreach (var property in doc.RootElement.EnumerateObject())
+            if (content is DNSRecord dnsRecord)
             {
-                formatted.AppendLine($"{property.Name}: {property.Value}");
+                return JsonSerializer.Serialize(dnsRecord, new JsonSerializerOptions());
             }
-            return formatted.ToString();
+            return content.ToString() ?? "No content";
         }
         catch
         {
-            return content.ToString() ?? "No content";
+            return "Invalid content";
         }
     }
 }
