@@ -132,7 +132,7 @@ class ClientUDP
         Message msg = MessageHandler.CreateMessage(1, MessageType.Hello, "Hello from client!");
         udpClient.Send(msg);
 
-        Console.WriteLine($"Sent: {msg.Content} to {setting.ServerIPAddress}:{setting.ServerIPAddress}");
+        Console.WriteLine($"Sent: {msg.Content} to {setting.ServerIPAddress}:{setting.ServerPortNumber}");
 
         Message receivemessage = udpClient.Receive();
 
